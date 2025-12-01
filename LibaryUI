@@ -1,0 +1,342 @@
+-- UILibrary.lua (ModuleScript)
+local UILibrary = {}
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+-- Configuración de estilos modernos
+local COLORS = {
+    Primary = Color3.fromRGB(30, 30, 40),      -- Fondo oscuro
+    Secondary = Color3.fromRGB(50, 50, 60),    -- Secundario
+    Accent = Color3.fromRGB(100, 150, 255),    -- Azul moderno
+    Text = Color3.fromRGB(255, 255, 255),      -- Texto blanco
+    Hover = Color3.fromRGB(70, 70, 80),        -- Hover
+    Success = Color3.fromRGB(76, 175, 80),     -- Verde para toggle on
+    Danger = Color3.fromRGB(244, 67, 54)       -- Rojo para toggle off
+}
+
+local CORNER_RADIUS = UDim.new(0, 8)
+local ANIMATION_TIME = 0.2
+local FONT = Enum.Font.GothamBold
+
+-- Función helper para crear esquinas redondeadas
+local function AddCorner(parent, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = radius or CORNER_RADIUS
+    corner.Parent = parent
+    return corner
+end
+
+-- Función helper para gradiente
+local function AddGradient(parent, color1, color2)
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, color1),
+        ColorSequenceKeypoint.new(1, color2)
+    }
+    gradient.Rotation = 45
+    gradient.Parent = parent
+    return gradient
+end
+
+-- Función helper para tween
+local function Tween(obj, props)
+    local tween = TweenService:Create(obj, TweenInfo.new(ANIMATION_TIME, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), props)
+    tween:Play()
+    return tween
+end
+
+-- Crear ventana principal
+function UILibrary:CreateWindow(title, size)
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ModernUI"
+    screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    screenGui.ResetOnSpawn = false
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = size or UDim2.new(0, 400, 0, 300)
+    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+    mainFrame.BackgroundColor3 = COLORS.Primary
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
+    AddCorner(mainFrame)
+    AddGradient(mainFrame, COLORS.Primary, COLORS.Secondary)
+
+    -- Título
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -40, 0, 30)
+    titleLabel.Position = UDim2.new(0, 10, 0, 5)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = COLORS.Text
+    titleLabel.TextSize = 16
+    titleLabel.Font = FONT
+    titleLabel.Parent = mainFrame
+
+    -- Botón de cierre
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 20, 0, 20)
+    closeButton.Position = UDim2.new(1, -25, 0, 5)
+    closeButton.BackgroundColor3 = COLORS.Danger
+    closeButton.Text = "×"
+    closeButton.TextColor3 = COLORS.Text
+    closeButton.TextSize = 14
+    closeButton.Font = FONT
+    closeButton.BorderSizePixel = 0
+    closeButton.Parent = mainFrame
+    AddCorner(closeButton, UDim.new(0, 4))
+
+    closeButton.MouseButton1Click:Connect(function()
+        Tween(mainFrame, {Size = UDim2.new(0, 0, 0, 0)}):Wait()
+        screenGui:Destroy()
+    end)
+
+    closeButton.MouseEnter:Connect(function()
+        Tween(closeButton, {BackgroundColor3 = Color3.fromRGB(255, 100, 100)})
+    end)
+    closeButton.MouseLeave:Connect(function()
+        Tween(closeButton, {BackgroundColor3 = COLORS.Danger})
+    end)
+
+    -- Contenedor para tabs/content
+    local tabContainer = Instance.new("Frame")
+    tabContainer.Size = UDim2.new(1, 0, 0, 30)
+    tabContainer.Position = UDim2.new(0, 0, 0, 35)
+    tabContainer.BackgroundTransparency = 1
+    tabContainer.Parent = mainFrame
+
+    local contentContainer = Instance.new("Frame")
+    contentContainer.Size = UDim2.new(1, 0, 1, -65)
+    contentContainer.Position = UDim2.new(0, 0, 0, 65)
+    contentContainer.BackgroundTransparency = 1
+    contentContainer.Parent = mainFrame
+
+    local tabs = {}
+    local currentTab = nil
+
+    -- Función para agregar tab
+    function mainFrame:AddTab(name, iconId)
+        local tabButton = Instance.new("TextButton")
+        tabButton.Size = UDim2.new(0, 100, 1, 0)
+        tabButton.Position = UDim2.new(1, -100 * #tabs, 0, 0)
+        tabButton.BackgroundColor3 = COLORS.Secondary
+        tabButton.Text = name
+        tabButton.TextColor3 = COLORS.Text
+        tabButton.TextSize = 12
+        tabButton.Font = Enum.Font.Gotham
+        tabButton.BorderSizePixel = 0
+        tabButton.Parent = tabContainer
+        AddCorner(tabButton)
+
+        -- Icono (si se proporciona ID de imagen)
+        if iconId then
+            local icon = Instance.new("ImageLabel")
+            icon.Size = UDim2.new(0, 16, 0, 16)
+            icon.Position = UDim2.new(0, 5, 0.5, -8)
+            icon.BackgroundTransparency = 1
+            icon.Image = "rbxassetid://" .. tostring(iconId)
+            icon.Parent = tabButton
+            tabButton.TextXAlignment = Enum.TextXAlignment.Left
+            tabButton.Text = "  " .. name  -- Espacio para icono
+        end
+
+        local tabContent = Instance.new("Frame")
+        tabContent.Size = UDim2.new(1, 0, 1, 0)
+        tabContent.BackgroundTransparency = 1
+        tabContent.Visible = false
+        tabContent.Parent = contentContainer
+
+        table.insert(tabs, {button = tabButton, content = tabContent})
+
+        tabButton.MouseButton1Click:Connect(function()
+            if currentTab then
+                currentTab.content.Visible = false
+                Tween(currentTab.button, {BackgroundColor3 = COLORS.Secondary})
+            end
+            currentTab = tabs[#tabs]
+            currentTab.content.Visible = true
+            Tween(currentTab.button, {BackgroundColor3 = COLORS.Accent})
+        end)
+
+        tabButton.MouseEnter:Connect(function()
+            if tabButton ~= currentTab.button then
+                Tween(tabButton, {BackgroundColor3 = COLORS.Hover})
+            end
+        end)
+        tabButton.MouseLeave:Connect(function()
+            if tabButton ~= currentTab.button then
+                Tween(tabButton, {BackgroundColor3 = COLORS.Secondary})
+            end
+        end)
+
+        -- Activar primer tab por defecto
+        if #tabs == 1 then
+            currentTab = tabs[1]
+            currentTab.content.Visible = true
+            Tween(currentTab.button, {BackgroundColor3 = COLORS.Accent})
+        end
+
+        return tabContent  -- Retorna el contenedor para agregar elementos
+    end
+
+    -- Función para crear botón
+    function contentContainer:CreateButton(text, callback, size)
+        local button = Instance.new("TextButton")
+        button.Size = size or UDim2.new(1, -20, 0, 30)
+        button.Position = UDim2.new(0, 10, 0, #contentContainer:GetChildren() * 35)
+        button.BackgroundColor3 = COLORS.Accent
+        button.Text = text
+        button.TextColor3 = COLORS.Text
+        button.TextSize = 14
+        button.Font = FONT
+        button.BorderSizePixel = 0
+        button.Parent = self
+        AddCorner(button)
+
+        button.MouseButton1Click:Connect(callback)
+        button.MouseEnter:Connect(function()
+            Tween(button, {BackgroundColor3 = Color3.fromRGB(120, 170, 255)})
+        end)
+        button.MouseLeave:Connect(function()
+            Tween(button, {BackgroundColor3 = COLORS.Accent})
+        end)
+
+        return button
+    end
+
+    -- Función para crear toggle (switch)
+    function contentContainer:CreateToggle(text, default, callback, size)
+        local frame = Instance.new("Frame")
+        frame.Size = size or UDim2.new(1, -20, 0, 30)
+        frame.Position = UDim2.new(0, 10, 0, #contentContainer:GetChildren() * 35)
+        frame.BackgroundTransparency = 1
+        frame.Parent = self
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0.7, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = text
+        label.TextColor3 = COLORS.Text
+        label.TextSize = 14
+        label.Font = Enum.Font.Gotham
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = frame
+
+        local switch = Instance.new("Frame")
+        switch.Size = UDim2.new(0, 40, 0, 20)
+        switch.Position = UDim2.new(1, -50, 0.5, -10)
+        switch.BackgroundColor3 = COLORS.Danger
+        switch.BorderSizePixel = 0
+        switch.Parent = frame
+        AddCorner(switch, UDim.new(0, 10))
+
+        local knob = Instance.new("Frame")
+        knob.Size = UDim2.new(0, 16, 0, 16)
+        knob.Position = UDim2.new(0, 2, 0.5, -8)
+        knob.BackgroundColor3 = COLORS.Text
+        knob.BorderSizePixel = 0
+        knob.Parent = switch
+        AddCorner(knob, UDim.new(0, 8))
+
+        local isOn = default or false
+        local function UpdateToggle()
+            if isOn then
+                Tween(switch, {BackgroundColor3 = COLORS.Success})
+                Tween(knob, {Position = UDim2.new(1, -18, 0.5, -8)})
+            else
+                Tween(switch, {BackgroundColor3 = COLORS.Danger})
+                Tween(knob, {Position = UDim2.new(0, 2, 0.5, -8)})
+            end
+            callback(isOn)
+        end
+
+        switch.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                isOn = not isOn
+                UpdateToggle()
+            end
+        end)
+
+        UpdateToggle()
+        return frame
+    end
+
+    -- Función para crear slider
+    function contentContainer:CreateSlider(text, min, max, default, callback, size)
+        local frame = Instance.new("Frame")
+        frame.Size = size or UDim2.new(1, -20, 0, 50)
+        frame.Position = UDim2.new(0, 10, 0, #contentContainer:GetChildren() * 55)
+        frame.BackgroundTransparency = 1
+        frame.Parent = self
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 0.4, 0)
+        label.BackgroundTransparency = 1
+        label.Text = text .. ": " .. tostring(default)
+        label.TextColor3 = COLORS.Text
+        label.TextSize = 14
+        label.Font = Enum.Font.Gotham
+        label.Parent = frame
+
+        local track = Instance.new("Frame")
+        track.Size = UDim2.new(1, 0, 0.3, 0)
+        track.Position = UDim2.new(0, 0, 0.6, 0)
+        track.BackgroundColor3 = COLORS.Secondary
+        track.BorderSizePixel = 0
+        track.Parent = frame
+        AddCorner(track, UDim.new(0, 4))
+
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+        fill.BackgroundColor3 = COLORS.Accent
+        fill.BorderSizePixel = 0
+        fill.Parent = track
+        AddCorner(fill, UDim.new(0, 4))
+
+        local knob = Instance.new("Frame")
+        knob.Size = UDim2.new(0, 12, 1, 0)
+        knob.Position = UDim2.new((default - min) / (max - min), -6, 0, 0)
+        knob.BackgroundColor3 = COLORS.Text
+        knob.BorderSizePixel = 0
+        knob.Parent = track
+        AddCorner(knob, UDim.new(0, 6))
+
+        local dragging = false
+        local currentValue = default
+
+        local function UpdateSlider(value)
+            currentValue = math.clamp(value, min, max)
+            local percent = (currentValue - min) / (max - min)
+            Tween(fill, {Size = UDim2.new(percent, 0, 1, 0)})
+            Tween(knob, {Position = UDim2.new(percent, -6, 0, 0)})
+            label.Text = text .. ": " .. tostring(math.floor(currentValue))
+            callback(currentValue)
+        end
+
+        track.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+            end
+        end)
+
+        track.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local mouse = UserInputService:GetMouseLocation()
+                local relativeX = math.clamp((mouse.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+                UpdateSlider(min + relativeX * (max - min))
+            end
+        end)
+
+        UpdateSlider(default)
+        return frame
+    end
+
+    return mainFrame
+end
+
+return UILibrary
